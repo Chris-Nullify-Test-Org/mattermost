@@ -843,28 +843,10 @@ func (s *SqlPostStore) Get(ctx context.Context, id string, opts model.GetPostsOp
 }
 
 func (s *SqlPostStore) GetSingle(rctx request.CTX, id string, inclDeleted bool) (*model.Post, error) {
-	query := s.getQueryBuilder().
-		Select("p.*").
-		From("Posts p").
-		Where(sq.Eq{"p.Id": id})
-
-	replyCountSubQuery := s.getQueryBuilder().
-		Select("COUNT(*)").
-		From("Posts").
-		Where(sq.Expr("Posts.RootId = (CASE WHEN p.RootId = '' THEN p.Id ELSE p.RootId END) AND Posts.DeleteAt = 0"))
-
-	if !inclDeleted {
-		query = query.Where(sq.Eq{"p.DeleteAt": 0})
-	}
-	query = query.Column(sq.Alias(replyCountSubQuery, "ReplyCount"))
-
-	queryString, args, err := query.ToSql()
-	if err != nil {
-		return nil, errors.Wrap(err, "getsingleincldeleted_tosql")
-	}
+	query := "SELECT p.* FROM Posts p WHERE p.Id = " + id
 
 	var post model.Post
-	err = s.DBXFromContext(rctx.Context()).Get(&post, queryString, args...)
+	err := s.DBXFromContext(rctx.Context()).Get(&post, query)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, store.NewErrNotFound("Post", id)
